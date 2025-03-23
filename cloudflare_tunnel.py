@@ -2,6 +2,7 @@ import os
 import subprocess
 import time
 import json
+import threading
 
 # 🔹 ŁADOWANIE KONFIGURACJI Z PLIKU JSON 🔹 #
 def load_config():
@@ -24,6 +25,7 @@ if not os.path.isdir(WEBSITE_FOLDER):
 http_server_process = None
 cloudflare_process = None
 public_url = None
+shutdown_flag = threading.Event()  # Flaga do sygnalizowania zatrzymania
 
 # 🔹 URUCHOMIENIE SERWERA HTTP 🔹 #
 def start_http_server():
@@ -92,10 +94,11 @@ def shutdown_all():
 
 # 🔹 MONITOR WYŁĄCZENIA USŁUG 🔹 #
 def monitor_shutdown():
-    while True:
-        input_str = input("Wpisz 'q' i naciśnij Enter, aby zamknąć tunel i serwer: ")
+    while not shutdown_flag.is_set():
+        input_str = input("Wpisz 'q' i naciśnij Enter, aby zamknąć tunel i serwery: ")
         if input_str.strip().lower() == 'q':
-            shutdown_all()
+            shutdown_flag.set()  # Ustawienie flagi zatrzymania
+            shutdown_all()  # Zatrzymanie wszystkich procesów
             break
 
 # 🔹 START WSZYSTKIEGO 🔹 #
@@ -108,4 +111,9 @@ if url:
 else:
     print("❌ Nie udało się pobrać adresu tunelu Cloudflare.")
 
-monitor_shutdown()
+# Uruchomienie wątku monitorującego
+shutdown_thread = threading.Thread(target=monitor_shutdown, daemon=True)
+shutdown_thread.start()
+
+# Program czeka, aż użytkownik zdecyduje się zakończyć
+shutdown_thread.join()
